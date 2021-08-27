@@ -12,6 +12,11 @@ logging.basicConfig(level=logging.DEBUG)
 class Controller:
 
     def __init__(self):
+
+        logging.debug("Start")
+
+        self.state: int = const.STATE_IDLE
+
         self.flow: int = 0
         self.liquid: int = 0
         self.coins: int = 0
@@ -87,42 +92,74 @@ class Controller:
         except asyncio.CancelledError:
             self.led(False)
 
+    def inc_liquid(self, amount: int):
+
+        self.liquid += self.liquid + amount * 100
+        logging.debug("liquid = {}".format(self.liquid))
+
     def coin_callback(self, channel: int) -> None:
         logging.debug("coins: {}".format(channel))
 
-        if channel == const.IN_COIN_1:  # 1
+        if channel == const.IN_COIN_1:    # 1
             self.coins = self.coins + 1
+            self.inc_liquid(1)
         elif channel == const.IN_COIN_2:  # 2
             self.coins = self.coins + 2
+            self.inc_liquid(2)
         elif channel == const.IN_COIN_3:  # 5
             self.coins = self.coins + 5
+            self.inc_liquid(5)
+        elif channel == const.IN_COIN_TERMINAL:
+            self.coins = self.coins + 1
+            self.inc_liquid(1)
 
         logging.debug("coins = {}".format(self.coins))
 
-    def run(self):
+    def enough_liquid(self) -> bool:
+        return (self.liquid - self.flow) > 0
+
+    def pump(self, state) -> None:
+        GPIO.output(const.OUT_PUMP_1, state)
+
+    def change_state(self, value):
+        self.state = value
+
+    async def run(self, event_loop):
+
+        led_task = None
 
         while True:
 
-            if self.coins > 0:
-                pass
-                # start pump
-            else:
-                pass
-                # stop pump
+            if self.state == const.STATE_IDLE:
+                if self.enough_liquid():
+                    self.pump(True)
+                    self.change_state(const.STATE_WORKING)
+                    led_task = event_loop.create_task(self.led_task())
+
+            if self.state == const.STATE_WORKING:
+                if not self.enough_liquid():
+                    self.pump(False)
+                    self.reset()
+                    self.change_state(const.STATE_IDLE)
+
+                    if not led_task == None:
+                        led_task.cancel()
+
+            await asyncio.sleep(0.1)
 
 
 if __name__ == '__main__':
 
     ctrl = Controller()
 
-    loop = asyncio.get_event_loop()
+    event_loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(ctrl.run())
+        event_loop.run_until_complete(ctrl.run(event_loop))
 
     except KeyboardInterrupt:
         pass
 
     finally:
-        print("[debug] Closing")
-        loop.close()
+        logging.debug("Closing")
+        event_loop.close()
         GPIO.cleanup()
