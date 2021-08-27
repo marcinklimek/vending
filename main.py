@@ -19,7 +19,6 @@ class Controller:
         self.flow: int = 0
         self.liquid: int = 0
         self.coins: int = 0
-        self.led_time: float = 0.5
         self.timeout_timer: int = const.CANCEl_TIMEOUT
 
         self.setup()
@@ -29,7 +28,6 @@ class Controller:
         self.flow = 0
         self.liquid = 0
         self.coins = 0
-        self.led_time = 0.5
         self.timeout_timer = const.CANCEl_TIMEOUT
 
     def setup(self) -> None:
@@ -99,11 +97,13 @@ class Controller:
     async def led_task(self):
         try:
             while True:
+                led_time = const.BASE_LED_TIME - (self.flow / self.liquid) * (const.BASE_LED_TIME - 0.1)
+
                 self.led(True)
-                await asyncio.sleep(self.led_time)
+                await asyncio.sleep(led_time)
 
                 self.led(False)
-                await asyncio.sleep(self.led_time)
+                await asyncio.sleep(led_time)
 
         except asyncio.CancelledError:
             self.led(False)
@@ -143,6 +143,9 @@ class Controller:
 
     async def run(self, loop):
 
+        blink = None
+        timeout = None
+
         while True:
 
             if self.state == const.STATE_IDLE:
@@ -165,8 +168,6 @@ class Controller:
                         timeout.cancel()
 
             await asyncio.sleep(0.1)
-
-
 
 
 if __name__ == '__main__':
