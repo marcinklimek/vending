@@ -1,5 +1,101 @@
 .App {
+  width:1024px;
+  height:600px;
+}
+
+.dot {
+  background: linear-gradient(45deg, rgba(76,101,98,1) 0%, rgba(73,73,73,1) 100%);
+
+  width:300px;
+  height:300px;
+
+  border-style: solid;
+  border-color: white;
+  border-width: 5px;
+  border-radius: 50%;
+
+  justify-self: center;
+  align-self: center;
+
+  display: flex;
+
   text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+.money {
+
+}
+
+.money-value {
+  font-size: calc(20px + 6vmin);
+  color: #11f7f4;
+}
+
+.money-currency {
+  color: #11f7f4;
+}
+
+.container {
+  min-height: 100%;
+  min-width: 100%;
+
+  background: linear-gradient(45deg, rgba(76,101,98,1) 0%, rgba(73,73,73,1) 100%);
+
+  font-size: calc(10px + 2vmin);
+  color: white;
+
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr 1fr;
+  grid-template-rows: 0.6fr 1.9fr 0.5fr;
+  gap: 0px 0px;
+  grid-auto-flow: row;
+  grid-template-areas:
+    "left-area top-area top-area top-area"
+    "left-area . payment-area payment-area"
+    "left-area info-area info-area button-area";
+}
+
+.fill-area {
+
+  justify-self: center;
+  align-self: center;
+}
+
+.left-area {
+
+  align-self: start;
+  grid-area: left-area;
+}
+
+.top-area {
+
+  justify-self: center;
+  align-self: center;
+  grid-area: top-area;
+}
+
+.payment-area {
+
+  justify-self: center;
+  align-self: center;
+  grid-area: payment-area;
+
+  margin: auto;
+}
+
+.info-area {
+
+  justify-self: stretch;
+  grid-area: info-area;
+}
+
+.button-area {
+
+  justify-self: center;
+  align-self: end;
+  grid-area: button-area;
 }
 
 .App-logo {
@@ -11,21 +107,6 @@
   .App-logo {
     animation: App-logo-spin infinite 3s ease ;
   }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
 }
 
 @keyframes App-logo-spin {
