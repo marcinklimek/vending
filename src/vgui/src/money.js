@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useState} from "react";
 
 import Comm from "./Comm";
 
@@ -8,29 +8,21 @@ class Money extends React.Component {
         super(props);
 
         this.state = {
-            currentData: []
+            money: 0
         };
 
-        this.comm = new Comm();
-        this.comm.setOnMessage( this.handler )
-        this.comm.setOnConnect( this.connected )
+        this.comm = new Comm(this.handler);
     }
 
-    connected()
-    {
-        this.comm.sendMessage("status");
-    }
-
-    handler(data) {
-        this.setState( data );
+    handler = (data) => {
+        const status = JSON.parse(data.data);
+        this.setState({money:status.money});
     }
 
     render() {
-
-        console.log(this.state.currentData);
         return (
             <div>
-                41
+                {this.state.money}
             </div>
         );
     }

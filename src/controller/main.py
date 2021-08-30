@@ -6,7 +6,41 @@ import asyncio
 import logging
 import constans as const
 
+import json
+import random
+import websockets
+
 logging.basicConfig(level=logging.DEBUG)
+
+
+# comminication part
+async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue):
+
+    clients = set()
+
+    async def register(websocket, path):
+
+        print("Connected")
+
+        # Register client
+        clients.add(websocket)
+        try:
+            # Wait forever for messages
+            async for message in websocket:
+                print(websocket, message)
+        finally:
+            try:
+                clients.remove(websocket)
+            except Exception:
+                pass
+
+    async with websockets.serve(register, "localhost", 8888):
+        while not stop_signal.is_set():
+            # TODO: there's a small bug here in that the stop signal is only checked
+            #       after a message has been processed
+            msg = await message_queue.get()
+            for client in clients:
+                await client.send(msg)
 
 
 class Controller:
@@ -15,6 +49,10 @@ class Controller:
 
         logging.debug("Start")
 
+        self.stop_signal = asyncio.Event()
+        self.message_queue = asyncio.Queue()
+
+        self.dirty = True
         self.state: int = const.STATE_IDLE
         self.flow: int = 0
         self.liquid: int = 0
@@ -24,11 +62,17 @@ class Controller:
         self.setup()
         self.reset()
 
+
     def reset(self):
         self.flow = 0
         self.liquid = 0
         self.coins = 0
         self.timeout_timer = const.CANCEl_TIMEOUT
+        self.dirty = True
+
+    def get_status(self):
+        return {"money": self.coins,
+                "liquid": self.liquid }
 
     def setup(self) -> None:
 
@@ -70,6 +114,7 @@ class Controller:
         self.reset_timer()
 
         self.flow += 1
+        self.dirty = True
 
         logging.debug("flow in = {}".format(self.flow))
 
@@ -111,6 +156,8 @@ class Controller:
     def inc_liquid(self, amount: int):
 
         self.liquid += amount * 100
+        self.dirty = True
+
         logging.debug("liquid = {} ({})".format(self.liquid, amount))
 
     def coin_callback(self, channel: int) -> None:
@@ -130,6 +177,8 @@ class Controller:
             self.coins = self.coins + 1
             self.inc_liquid(1)
 
+        self.dirty = True
+
         logging.debug("coins amount = {}".format(self.coins))
 
     def check(self) -> bool:
@@ -141,10 +190,13 @@ class Controller:
     def change_state(self, value):
         self.state = value
 
-    async def run(self, loop):
+    async def run(self):
 
         blink = None
         timeout = None
+
+        self.ws_server_task = asyncio.create_task(
+            status_server(self.stop_signal, self.message_queue) )
 
         while True:
 
@@ -152,8 +204,8 @@ class Controller:
                 if self.check():
                     self.pump(True)
                     self.change_state(const.STATE_WORKING)
-                    blink = loop.create_task(self.led_task())
-                    timeout = loop.create_task(self.timeout_task())
+                    blink = asyncio.create_task(self.led_task())
+                    timeout = asyncio.create_task(self.timeout_task())
 
             if self.state == const.STATE_WORKING:
                 if not self.check():
@@ -167,21 +219,37 @@ class Controller:
                     if timeout is not None:
                         timeout.cancel()
 
+            if self.dirty:
+                self.dirty = False
+                await self.message_queue.put(json.dumps(self.get_status()))
+
             await asyncio.sleep(0.1)
+
+    async def stop(self):
+        self.stop_signal.set()
+        self.message_queue.put(json.dumps(self.get_status()))
+
+        await self.ws_server_task
 
 
 if __name__ == '__main__':
 
     ctrl = Controller()
 
-    event_loop = asyncio.get_event_loop()
     try:
-        event_loop.run_until_complete(ctrl.run(event_loop))
+        asyncio.run(ctrl.run())
 
     except KeyboardInterrupt:
         pass
 
     finally:
         logging.debug("Closing")
-        event_loop.close()
+
+        ctrl.stop()
+
         GPIO.cleanup()
+
+        # force to disable pumps
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(const.OUT_PUMP_1, GPIO.OUT, initial=GPIO.LOW)
+        GPIO.setup(const.OUT_PUMP_2, GPIO.OUT, initial=GPIO.LOW)

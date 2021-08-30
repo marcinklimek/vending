@@ -1,17 +1,9 @@
 import './App.css';
-import React, { useState } from 'react';
+import React from 'react';
 import Money from "./money";
 import Liquid from "./Liquid";
 
-
-
 function App() {
-
-  const [money, setMoney] = useState(0);
-  const [liquidAmount, setLiquidAmount] = useState(0);
-  const [liquidPrice, setLiquidPrice] = useState(0);
-
-    console.log("App");
 
   return (
       <div className="App">
@@ -45,7 +37,7 @@ function App() {
 
               <div className="info-area">
                   <div className="info-container">
-                  Cena jednego litra płynu: {liquidPrice} PLN
+                  Cena jednego litra płynu: 2 PLN
                   </div>
               </div>
               <div className="button-area">START</div>
