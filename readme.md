@@ -2,6 +2,22 @@
 
 https://itnext.io/raspberry-pi-read-only-kiosk-mode-the-complete-tutorial-for-2021-58a860474215
 
+## Konfiguracja pinów przy boot
+
+### Old method
+[how to update device tree](https://planktonscope.readthedocs.io/en/stable/update_device-tree.html)
+
+[shell commands](https://gist.github.com/niun/f8443db5bbfaaf02b026)
+
+* apt-get install device-tree-compiler
+* wget https://raw.githubusercontent.com/raspberrypi/firmware/master/extra/dt-blob.dts
+* # for example, set P1:26 (BCM pin 7) to active low (on Raspi B Rev2.0, in dts file from August): 
+* awk 'NR==104{print "                  pin@p7  { function = \"output\"; termination = \"pull_down\"; }; // SPI_CE1_N (P1:26)"}1' dt-blob.dts > dt-blob-mod.dts
+* dtc -I dts -O dtb -o /boot/dt-blob.bin dt-blob-mod.dts
+
+### a new method
+	[config.txt - gpio](https://www.raspberrypi.org/documentation/computers/config_txt.html#gpio)
+
 
 # HDMI display
 

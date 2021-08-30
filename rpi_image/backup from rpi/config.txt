@@ -18,8 +18,8 @@
 
 # uncomment to force a console size. By default it will be display's size minus
 # overscan.
-#framebuffer_width=1024
-#framebuffer_height=600
+#framebuffer_width=1280
+#framebuffer_height=720
 
 # uncomment if hdmi display is not detected and composite is being output
 hdmi_force_hotplug=1
@@ -30,8 +30,6 @@ hdmi_mode=87
 hdmi_cvt=1024 600 60 3 0 0 0
 disable_overscan=1
 hdmi_drive=1
-
-max_usb_current=1
 
 # uncomment to force a HDMI mode rather than DVI. This can make audio work in
 # DMT (computer monitor) modes
@@ -48,7 +46,7 @@ max_usb_current=1
 #arm_freq=800
 
 # Uncomment some or all of these to enable the optional hardware interfaces
-dtparam=i2c_arm=on
+#dtparam=i2c_arm=on
 #dtparam=i2s=on
 #dtparam=spi=on
 
@@ -68,35 +66,3 @@ max_framebuffers=2
 
 [all]
 #dtoverlay=vc4-fkms-v3d
-
-
-# GPIO at startup
-#
-#	  ip - Input
-#      op - Output
-#     a0-a5 - Alt0-Alt5
-#     dh - Driving high (for outputs)
-#     dl - Driving low (for outputs)
-#     pu - Pull up
-#     pd - Pull down
-#     np - No pull
-#
-#   Attributes are applied in order, as are gpio commands.
-#
-#   Examples:
-
-#     # Select Alt2 for GPIOs 0 to 27
-#     gpio=0-27=a2
-
-#     # Set GPIO12 to be an output set to 1
-#     gpio=12=op,dh
-#
-#     # Change the pull on (input) pins 18 and 20
-#     gpio=18,20=pu
-#
-#     # Make 17 to 21 inputs
-#     gpio=17-21=ip
-
-
-gpio=12=op,dl
-gpio=16=op,dl

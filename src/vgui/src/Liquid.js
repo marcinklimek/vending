@@ -1,5 +1,4 @@
 import React from "react";
-
 import Comm from "./Comm";
 
 class Liquid extends React.Component {
@@ -8,34 +7,21 @@ class Liquid extends React.Component {
         super(props);
 
         this.state = {
-            currentData: []
+            liquid: 0
         };
 
-        this.comm = new Comm();
-        this.comm.setOnMessage( this.handler )
-        this.comm.setOnConnect( this.connected )
-        this.comm.connect();
-
-        console.log("Liquid constructor");
+        this.comm = new Comm(this.handler);
     }
 
-    connected()
-    {
-        this.comm.sendMessage("status");
-        console.log("Liquid connected");
-    }
-
-    handler(data) {
-        this.setState( data );
-        console.log("Liquid handler");
+    handler = (data) => {
+        const status = JSON.parse(data.data);
+        this.setState({liquid:status.liquid});
     }
 
     render() {
-
-        console.log(this.state.currentData);
         return (
             <div>
-                100
+                {this.state.liquid}
             </div>
         );
     }
