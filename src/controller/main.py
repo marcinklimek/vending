@@ -34,11 +34,18 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
             except Exception:
                 pass
 
-    async with websockets.serve(register, "localhost", 8888):
+
+    print("status_server before")
+    async with websockets.serve(register, "127.0.0.1", 8888):
+
+        print("status_server after serve")
         while not stop_signal.is_set():
             # TODO: there's a small bug here in that the stop signal is only checked
             #       after a message has been processed
             msg = await message_queue.get()
+
+            print("msg: {}".format(msg))
+
             for client in clients:
                 await client.send(msg)
 
@@ -232,20 +239,22 @@ class Controller:
         await self.ws_server_task
 
 
-if __name__ == '__main__':
-
-    ctrl = Controller()
-
+async def main():
     try:
-        asyncio.run(ctrl.run())
+        ctrl = Controller()
+        await asyncio.create_task( ctrl.run() )
 
     except KeyboardInterrupt:
         pass
+    finally:
+        await ctrl.stop()
 
+if __name__ == '__main__':
+
+    try:
+        asyncio.run(main())
     finally:
         logging.debug("Closing")
-
-        ctrl.stop()
 
         GPIO.cleanup()
 
