@@ -15,7 +15,7 @@ class Liquid extends React.Component {
 
     handler = (data) => {
         const status = JSON.parse(data.data);
-        this.setState({liquid:status.liquid});
+        this.setState({liquid:status.flow});
     }
 
     render() {

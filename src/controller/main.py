@@ -10,12 +10,11 @@ import json
 import random
 import websockets
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 # comminication part
 async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue):
-
     clients = set()
 
     async def register(websocket, path):
@@ -33,7 +32,6 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
                 clients.remove(websocket)
             except Exception:
                 pass
-
 
     print("status_server before")
     async with websockets.serve(register, "127.0.0.1", 8888):
@@ -69,7 +67,6 @@ class Controller:
         self.setup()
         self.reset()
 
-
     def reset(self):
         self.flow = 0
         self.liquid = 0
@@ -79,7 +76,8 @@ class Controller:
 
     def get_status(self):
         return {"money": self.coins,
-                "liquid": self.liquid }
+                "liquid": self.liquid,
+                "flow": self.flow}
 
     def setup(self) -> None:
 
@@ -171,7 +169,7 @@ class Controller:
 
         self.reset_timer()
 
-        if channel == const.IN_COIN_1:    # 1
+        if channel == const.IN_COIN_1:  # 1
             self.coins = self.coins + 1
             self.inc_liquid(1)
         elif channel == const.IN_COIN_2:  # 2
@@ -203,7 +201,7 @@ class Controller:
         timeout = None
 
         self.ws_server_task = asyncio.create_task(
-            status_server(self.stop_signal, self.message_queue) )
+            status_server(self.stop_signal, self.message_queue))
 
         while True:
 
@@ -230,31 +228,26 @@ class Controller:
                 self.dirty = False
                 await self.message_queue.put(json.dumps(self.get_status()))
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
 
     async def stop(self):
-        self.stop_signal.set()
-        self.message_queue.put(json.dumps(self.get_status()))
 
+        self.stop_signal.set()
+
+        await self.message_queue.put(json.dumps(self.get_status()))
         await self.ws_server_task
 
 
 async def main():
     try:
         ctrl = Controller()
-        await asyncio.create_task( ctrl.run() )
+        await asyncio.create_task(ctrl.run())
 
     except KeyboardInterrupt:
         pass
+
     finally:
         await ctrl.stop()
-
-if __name__ == '__main__':
-
-    try:
-        asyncio.run(main())
-    finally:
-        logging.debug("Closing")
 
         GPIO.cleanup()
 
@@ -262,3 +255,14 @@ if __name__ == '__main__':
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(const.OUT_PUMP_1, GPIO.OUT, initial=GPIO.LOW)
         GPIO.setup(const.OUT_PUMP_2, GPIO.OUT, initial=GPIO.LOW)
+
+if __name__ == '__main__':
+
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        logging.debug("Closing")
+
+
