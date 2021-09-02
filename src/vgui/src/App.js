@@ -13,7 +13,7 @@ function App() {
                       <div className="filler-bar"/>
 
                       <span className="filler-value">
-                          <Liquid/>%
+                          <Liquid/>
                       </span>
                   </div>
               </div>

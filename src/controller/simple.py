@@ -22,13 +22,17 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
             except Exception:
                 pass
 
-    async with websockets.serve(register, "localhost", 8888):
+    async with websockets.serve(register, "127.0.0.1", 8888):
         while not stop_signal.is_set():
+
             # TODO: there's a small bug here in that the stop signal is only checked
             #       after a message has been processed
+
             msg = await message_queue.get()
             for client in clients:
                 await client.send(msg)
+
+            print("msg: {}".format(msg))
 
 
 def get_status():
@@ -60,7 +64,7 @@ async def main():
     await ws_server_task
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     asyncio.run(main())
 
