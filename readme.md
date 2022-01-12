@@ -47,3 +47,47 @@ https://github.com/pladaria/reconnecting-websocket
 https://pypi.org/project/websockets/
 https://websockets.readthedocs.io/en/stable/index.html
 https://pythonrepo.com/repo/aaugustin-websockets-python-websocket
+
+
+
+
+
+# TODO:
+
+licznik 
+  - suma całkowita, perma
+
+
+  dzwiek na przyjecie monety - pliki audio
+  	 - 1 zł
+  	 - 2 zł
+  	 - 5 zł
+  dzwiek przy kończeniu sie nalewania + mruganie coraz szybsze
+
+
+  w konfiguracji - czas braku aktywności
+
+
+  od 80% zwiekszać częstotliwość mrugania
+
+
+  - hydrostat
+  jak rozwarte to nieczynne
+
+  - ogranicznik na impulsy, jeśli ich brak w zadanym czasie
+
+
+
+  złącze HDMI kątowe 
+  złącze USB kątowe
+
+
+
+  - przetestować przyciski START, STOP
+
+
+  - wyjście przekaźnikowe zabezpieczone diodą
+
+
+
+poszukać rys tech do wyświetlacza
