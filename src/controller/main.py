@@ -1,7 +1,18 @@
+# https://pythonguides.com/python-tkinter-image/
+
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
-import RPi.GPIO as GPIO
+import platform
+
+useGpio = True  # on rpi
+
+if platform.system() == "Windows":
+    useGpio = False
+    import keyboard
+else:
+    import RPi.GPIO as GPIO
+
 import asyncio
 import logging
 import constans as const
@@ -11,7 +22,6 @@ import random
 import websockets
 
 logging.basicConfig(level=logging.INFO)
-
 
 # comminication part
 async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue):
@@ -33,7 +43,7 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
             except Exception:
                 pass
 
-    print("status_server before")
+
     async with websockets.serve(register, "127.0.0.1", 8888):
 
         print("status_server after serve")
@@ -79,7 +89,17 @@ class Controller:
                 "liquid": self.liquid,
                 "flow": self.flow}
 
+    def print_pressed_keys(self, e):
+        line = ', '.join(str(code) for code in keyboard._pressed_events)
+        # '\r' and end='' overwrites the previous line.
+        # ' '*40 prints 40 spaces at the end to ensure the previous line is cleared.
+        print(line)
+
     def setup(self) -> None:
+
+        if not useGpio:
+            keyboard.hook(self.print_pressed_keys)
+            return
 
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(True)
@@ -127,6 +147,9 @@ class Controller:
         logging.debug("button: {}".format(channel))
 
     def led(self, state: bool) -> None:
+        if not useGpio:
+            return
+
         GPIO.output(const.OUT_LED, state)
 
     def reset_timer(self):
@@ -190,6 +213,9 @@ class Controller:
         return (self.timeout_timer > 0) and (self.liquid - self.flow) > 0  # enough liquid and idle timer not timed out?
 
     def pump(self, state) -> None:
+        if not useGpio:
+            return
+
         GPIO.output(const.OUT_PUMP_1, state)
 
     def change_state(self, value):
@@ -249,12 +275,13 @@ async def main():
     finally:
         await ctrl.stop()
 
-        GPIO.cleanup()
+        if useGpio:
+            GPIO.cleanup()
 
-        # force to disable pumps
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(const.OUT_PUMP_1, GPIO.OUT, initial=GPIO.LOW)
-        GPIO.setup(const.OUT_PUMP_2, GPIO.OUT, initial=GPIO.LOW)
+            # force to disable pumps
+            GPIO.setmode(GPIO.BOARD)
+            GPIO.setup(const.OUT_PUMP_1, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(const.OUT_PUMP_2, GPIO.OUT, initial=GPIO.LOW)
 
 if __name__ == '__main__':
 
