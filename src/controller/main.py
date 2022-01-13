@@ -20,8 +20,9 @@ import constans as const
 import json
 import random
 import websockets
+from syncer import sync
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 # comminication part
 async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue):
@@ -74,6 +75,8 @@ class Controller:
         self.coins: int = 0
         self.timeout_timer: int = const.CANCEl_TIMEOUT
 
+        self.ws_server_task = None
+
         self.setup()
         self.reset()
 
@@ -90,10 +93,30 @@ class Controller:
                 "flow": self.flow}
 
     def print_pressed_keys(self, e):
-        line = ', '.join(str(code) for code in keyboard._pressed_events)
+        # line = ', '.join(str(code) for code in keyboard._pressed_events)
+        # line2 = ', '.join(chr(code) for code in keyboard._pressed_events)
         # '\r' and end='' overwrites the previous line.
         # ' '*40 prints 40 spaces at the end to ensure the previous line is cleared.
-        print(line)
+        # print(line, line2)
+
+        scan_code = e.scan_code
+
+        #print(scan_code)
+
+        if scan_code == 33:   # letter f - flow
+            self.flow_sensor_callback(1)
+        else:
+            if e.event_type == "up":
+                if scan_code == 2:   # 1
+                    self.coin_callback(const.IN_COIN_1)
+                elif scan_code == 3:   # 2
+                    self.coin_callback(const.IN_COIN_2)
+                elif scan_code == 6:   # 5
+                    self.coin_callback(const.IN_COIN_3)
+                elif scan_code == 31:  # letter s
+                    pass
+                elif scan_code == 1:   # esc
+                    self.stop()
 
     def setup(self) -> None:
 
@@ -138,16 +161,18 @@ class Controller:
     def flow_sensor_callback(self, channel: int) -> None:
         self.reset_timer()
 
-        self.flow += 1
-        self.dirty = True
+        if self.liquid > 0:
+            self.flow += 1
+            self.dirty = True
 
-        logging.debug("flow in = {}".format(self.flow))
+            logging.debug("flow in = {}".format(self.flow))
 
     def button_callback(self, channel: int) -> None:
         logging.debug("button: {}".format(channel))
 
     def led(self, state: bool) -> None:
         if not useGpio:
+            logging.debug("led: {}".format(state))
             return
 
         GPIO.output(const.OUT_LED, state)
@@ -207,13 +232,13 @@ class Controller:
 
         self.dirty = True
 
-        logging.debug("coins amount = {}".format(self.coins))
 
     def check(self) -> bool:
         return (self.timeout_timer > 0) and (self.liquid - self.flow) > 0  # enough liquid and idle timer not timed out?
 
     def pump(self, state) -> None:
         if not useGpio:
+            logging.debug("pump = {}".format(state))
             return
 
         GPIO.output(const.OUT_PUMP_1, state)
@@ -221,12 +246,13 @@ class Controller:
     def change_state(self, value):
         self.state = value
 
-    async def run(self):
+    async def run(self, loop):
 
+        self.loop = loop
         blink = None
         timeout = None
 
-        self.ws_server_task = asyncio.create_task(
+        self.ws_server_task = loop.create_task(
             status_server(self.stop_signal, self.message_queue))
 
         while True:
@@ -235,8 +261,8 @@ class Controller:
                 if self.check():
                     self.pump(True)
                     self.change_state(const.STATE_WORKING)
-                    blink = asyncio.create_task(self.led_task())
-                    timeout = asyncio.create_task(self.timeout_task())
+                    blink = loop.create_task(self.led_task())
+                    timeout = loop.create_task(self.timeout_task())
 
             if self.state == const.STATE_WORKING:
                 if not self.check():
@@ -256,24 +282,24 @@ class Controller:
 
             await asyncio.sleep(0.5)
 
-    async def stop(self):
+    def stop(self):
 
         self.stop_signal.set()
-
-        await self.message_queue.put(json.dumps(self.get_status()))
-        await self.ws_server_task
+        self.loop.stop()
 
 
-async def main():
+def main():
     try:
         ctrl = Controller()
-        await asyncio.create_task(ctrl.run())
+        loop = asyncio.get_event_loop()
+        loop.create_task(ctrl.run(loop))
+        loop.run_forever()
 
     except KeyboardInterrupt:
         pass
 
     finally:
-        await ctrl.stop()
+        ctrl.stop()
 
         if useGpio:
             GPIO.cleanup()
@@ -286,7 +312,7 @@ async def main():
 if __name__ == '__main__':
 
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         pass
     finally:
