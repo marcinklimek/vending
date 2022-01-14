@@ -22,7 +22,12 @@ import random
 import websockets
 from syncer import sync
 
-logging.basicConfig(level=logging.DEBUG)
+from threading import RLock
+lock = RLock()
+
+global_dict = {}
+
+logging.basicConfig(level=logging.WARNING)
 
 # comminication part
 async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue):
@@ -38,6 +43,8 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
             # Wait forever for messages
             async for message in websocket:
                 print(websocket, message)
+        except Exception:
+            pass
         finally:
             try:
                 clients.remove(websocket)
@@ -90,7 +97,8 @@ class Controller:
     def get_status(self):
         return {"money": self.coins,
                 "liquid": self.liquid,
-                "flow": self.flow}
+                "flow": self.flow,
+                "timeout": self.timeout_timer}
 
     def print_pressed_keys(self, e):
         # line = ', '.join(str(code) for code in keyboard._pressed_events)
@@ -115,8 +123,8 @@ class Controller:
                     self.coin_callback(const.IN_COIN_3)
                 elif scan_code == 31:  # letter s
                     pass
-                elif scan_code == 1:   # esc
-                    self.stop()
+                #elif scan_code == 1:   # esc
+                #    self.stop()
 
     def setup(self) -> None:
 
