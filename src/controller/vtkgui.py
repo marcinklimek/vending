@@ -6,12 +6,42 @@ import websockets
 import asyncio
 import json
 
+class Menu:
+
+    items = []
+
+    def __init__(self, canvas):
+        self.items.append(["Impulsy na litr", 100])
+        self.items.append(["Cena za litr", 2])
+        self.items_text = []
+        self.canvas = canvas
+
+    def setup_menu(self):
+        self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
+
+
+        for item in self.items:
+            key_text = self.canvas.create_text(870, 10, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
+            value_text = self.canvas.create_text(560, 75, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
+
+            self.items
+
+    def remove_menu(self):
+        self.canvas.delete(self.menu_bkg)
+        self.menu_bkg = None
+
+    def draw(self, canvas):
+        pass
 
 class State:
     coins = 0
     flow = 0
     liquid = 0
     percentage = 0
+    menu = False
+    menu_prev = False
+    menu_item_index = 0
+    quit = False
 
 state = State()
 
@@ -28,14 +58,18 @@ class WebSocketThread(threading.Thread):
     async def hello(self):
         uri = "ws://localhost:8888"
 
-        while True:
+        while not state.quit:
             try:
                 async with websockets.connect(uri) as websocket:
-                    while True:
+                    while not state.quit:
                         msg = await websocket.recv()
                         #print(f"<<< {msg}")
 
                         msg = json.loads(msg)
+
+                        state.menu_prev = state.menu
+                        state.menu = msg['menu']
+                        state.menu_item_index = msg['menu_item_index']
 
                         state.flow = msg['flow']
                         state.liquid = msg['liquid']
@@ -50,19 +84,15 @@ class WebSocketThread(threading.Thread):
             except Exception as ex:
                 print(ex)
 
+                if state.quit:
+                    return
+
     # overide run method
     def run(self):
         # must set a new loop for asyncio
         asyncio.set_event_loop(asyncio.new_event_loop())
         # setup a server
         asyncio.get_event_loop().run_until_complete(self.hello())
-        # keep thread running
-        asyncio.get_event_loop().run_forever()
-
-
-# start WebSocketThread #
-threadWebSocket = WebSocketThread("websocket_server")
-threadWebSocket.start()
 
 
 class UI:
@@ -94,6 +124,8 @@ class UI:
 
         self.setup_texts()
 
+        self.menu_bkg = None
+
         self.time_text = self.canvas.create_text(870, 10, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
         self.title_text = self.canvas.create_text(560,  75, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
         self.price_text = self.canvas.create_text(306, 545, fill="white", font="Segoe 20", anchor=tkinter.NW, text="")
@@ -109,6 +141,15 @@ class UI:
 
         self.update_texts()
 
+    def setup_menu(self):
+        self.canvas.itemconfig(self.coins_text, text="")
+        self.canvas.itemconfig(self.liquid_perc_text, text="")
+
+        self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
+
+    def remove_menu(self):
+        self.canvas.delete(self.menu_bkg)
+        self.menu_bkg = None
 
     def setup_texts(self):
         self.title_str = "Dystrybutor płynu"
@@ -123,8 +164,21 @@ class UI:
         self.liquid = 0
 
     def update_coins_flow(self):
-        self.canvas.itemconfig(self.coins_text, text=state.coins)
-        self.canvas.itemconfig(self.liquid_perc_text, text=state.percentage)
+
+        #add rect with menu bkg
+        if state.menu and not state.menu_prev:
+            self.setup_menu()
+            state.menu_prev = state.menu
+
+        if not state.menu and state.menu_prev:
+            self.remove_menu()
+            state.menu_prev = state.menu
+
+        if state.menu:
+            pass
+        else:
+            self.canvas.itemconfig(self.coins_text, text=state.coins)
+            self.canvas.itemconfig(self.liquid_perc_text, text=state.percentage)
 
 
     def update_texts(self):
@@ -152,6 +206,7 @@ class UI:
     def run(self):
         self.tick()
         self.update()
+
         self.root.mainloop()
 
 
@@ -181,4 +236,17 @@ class Rectangle(tkinter.Shape):
         bottom = self.bottom
         self.canvas.create_rectangle(left, top, right, bottom)"""
 
-UI().run()
+if __name__ == '__main__':
+
+    threadWebSocket = WebSocketThread("client")
+    threadWebSocket.start()
+
+    try:
+        UI().run()
+    except Exception:
+        print("Quit")
+    finally:
+        print("Cleaning")
+        state.quit = True
+        threadWebSocket.join()
+
