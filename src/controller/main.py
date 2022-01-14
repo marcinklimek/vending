@@ -75,6 +75,12 @@ class Controller:
         self.stop_signal = asyncio.Event()
         self.message_queue = asyncio.Queue()
 
+        self.menu = False
+        self.prev_menu = True
+
+        self.menu_item_index = 0
+        self.menu_item_max   = 1
+
         self.dirty = True
         self.state: int = const.STATE_IDLE
         self.flow: int = 0
@@ -88,6 +94,7 @@ class Controller:
         self.reset()
 
     def reset(self):
+
         self.flow = 0
         self.liquid = 0
         self.coins = 0
@@ -98,18 +105,17 @@ class Controller:
         return {"money": self.coins,
                 "liquid": self.liquid,
                 "flow": self.flow,
-                "timeout": self.timeout_timer}
+                "timeout": self.timeout_timer,
+                "menu": self.menu,
+                "menu_item_index": self.menu_item_index}
 
     def print_pressed_keys(self, e):
-        # line = ', '.join(str(code) for code in keyboard._pressed_events)
-        # line2 = ', '.join(chr(code) for code in keyboard._pressed_events)
-        # '\r' and end='' overwrites the previous line.
-        # ' '*40 prints 40 spaces at the end to ensure the previous line is cleared.
-        # print(line, line2)
-
         scan_code = e.scan_code
 
-        #print(scan_code)
+        """
+        
+        """
+        print(scan_code)
 
         if scan_code == 33:   # letter f - flow
             self.flow_sensor_callback(1)
@@ -123,8 +129,29 @@ class Controller:
                     self.coin_callback(const.IN_COIN_3)
                 elif scan_code == 31:  # letter s
                     pass
+                elif scan_code == 72:  # up (enter menu/ exit menu)
+                    self.process_menu(const.IN_UP)
+                elif scan_code == 80:  # down (next item)
+                    self.process_menu(const.IN_DOWN)
+                elif scan_code == 77:  # right (inc)
+                    self.process_menu(const.IN_RIGHT)
+                elif scan_code == 75:  # left  (dec)
+                    self.process_menu(const.IN_LEFT)
                 #elif scan_code == 1:   # esc
                 #    self.stop()
+
+    def process_menu(self, key):
+        if key == const.IN_UP:
+            self.menu = not self.menu
+
+        if self.menu:
+            if key == const.IN_DOWN:
+                self.menu_item_index = self.menu_item_index + 1
+                if self.menu_item_index > self.menu_item_max:
+                    self.menu_item_index = 0
+
+        self.dirty = True
+
 
     def setup(self) -> None:
 
@@ -265,14 +292,21 @@ class Controller:
 
         while True:
 
-            if self.state == const.STATE_IDLE:
-                if self.check():
+            if self.state == const.STATE_MENU:
+                if not self.menu:
+                    self.change_state(const.STATE_IDLE)
+
+            elif self.state == const.STATE_IDLE:
+
+                if self.menu:
+                    self.change_state(const.STATE_MENU)
+                elif self.check():
                     self.pump(True)
                     self.change_state(const.STATE_WORKING)
                     blink = loop.create_task(self.led_task())
                     timeout = loop.create_task(self.timeout_task())
 
-            if self.state == const.STATE_WORKING:
+            elif self.state == const.STATE_WORKING:
                 if not self.check():
                     self.pump(False)
                     self.reset()
@@ -288,7 +322,7 @@ class Controller:
                 self.dirty = False
                 await self.message_queue.put(json.dumps(self.get_status()))
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.1)
 
     def stop(self):
 
