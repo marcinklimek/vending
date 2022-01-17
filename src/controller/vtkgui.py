@@ -6,40 +6,9 @@ import websockets
 import asyncio
 import json
 import logging
+import constans as const
 
-logging.basicConfig(level=logging.DEBUG)
-
-class Menu:
-
-    items = []
-
-    def __init__(self, canvas):
-        self.items.append(["Impulsy na litr", 100])
-        self.items.append(["Cena za litr", 2])
-        self.items_text = []
-        self.canvas = canvas
-
-    def setup_menu(self):
-        self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
-
-        xoffset = 0
-        for item in self.items:
-            key_text = self.canvas.create_text(100, 100 + xoffset*50, fill="white", font="Segoe 35", anchor=tkinter.NW, text=item[0])
-            value_text = self.canvas.create_text(400, 100+ xoffset*50, fill="white", font="Segoe 35", anchor=tkinter.NW, text=item[1])
-            xoffset += 1
-
-            self.items_text.append((key_text, value_text))
-
-    def remove_menu(self):
-        self.canvas.delete(self.menu_bkg)
-        self.menu_bkg = None
-
-        for item in self.items_text:
-            self.canvas.delete(item[0])
-            self.canvas.delete(item[1])
-
-    def draw(self, canvas):
-        pass
+logging.basicConfig(level=logging.INFO)
 
 class State:
     coins = 0
@@ -50,8 +19,76 @@ class State:
     menu_prev = False
     menu_item_index = 0
     quit = False
+    menu_values = [-1, -1]
 
 state = State()
+
+class Menu:
+
+    items = []
+
+    def __init__(self, canvas):
+
+        self.items.append("Impulsy na litr")
+        self.items.append("Cena za litr")
+
+        self.items_text = []
+        self.canvas = canvas
+        self.x = 100
+        self.y = 100
+        self.w = 500
+        self.h = 60
+
+        self.menu_item_index = -1
+
+        self.menu_bkg = None
+        self.menu_frame = None
+
+
+    def setup_menu(self):
+        self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
+        self.menu_frame = self.canvas.create_rectangle(self.x, self.y, self.x + self.w, self.y + self.h, outline='red', width=2)
+
+        self.menu_item_index = -1
+
+        xoffset = 0
+        for item in self.items:
+            key_text = self.canvas.create_text(100, 100 + xoffset*self.h, fill="white", font="Segoe 35", anchor=tkinter.NW, text=item)
+            value_text = self.canvas.create_text(400, 100+ xoffset*self.h, fill="white", font="Segoe 35", anchor=tkinter.NW, text="-1")
+
+            xoffset += 1
+
+            self.items_text.append((key_text, value_text))
+
+
+
+    def remove_menu(self):
+        self.canvas.delete(self.menu_bkg)
+        self.menu_bkg = None
+        self.canvas.delete(self.menu_frame)
+        self.menu_frame = None
+
+        for item in self.items_text:
+            self.canvas.delete(item[0])
+            self.canvas.delete(item[1])
+
+        self.items_text = []
+        self.menu_item_index = -1
+
+    def draw(self, canvas):
+
+        index = 0
+        for item in self.items_text:
+            self.canvas.itemconfig(item[1], text=state.menu_values[index])
+            index += 1
+
+        if self.menu_item_index != state.menu_item_index:
+            self.canvas.delete(self.menu_frame)
+
+            self.menu_item_index = state.menu_item_index
+            self.menu_frame = self.canvas.create_rectangle(self.x, self.y + self.h*state.menu_item_index,
+                                                           self.x + self.w, self.y + self.h + self.h*state.menu_item_index,
+                                                           outline='red', width=2)
 
 
 class WebSocketThread(threading.Thread):
@@ -76,9 +113,11 @@ class WebSocketThread(threading.Thread):
 
                         msg = json.loads(msg)
 
+                        state.menu_values = msg['menu_values']
+                        state.menu_item_index = msg['menu_item_index']
+
                         state.menu_prev = state.menu
                         state.menu = msg['menu']
-                        state.menu_item_index = msg['menu_item_index']
 
                         state.flow = msg['flow']
                         state.liquid = msg['liquid']
@@ -86,7 +125,7 @@ class WebSocketThread(threading.Thread):
                         if state.liquid == 0:
                             state.percentage = 0.0
                         else:
-                            state.percentage = round( 1.0 - (state.flow / state.liquid), 2)
+                            state.percentage = round(1.0 - (state.flow / state.liquid), 2)
 
                         state.coins = round(msg['money'] * state.percentage, 2)
 
@@ -107,8 +146,6 @@ class WebSocketThread(threading.Thread):
 class UI:
 
     def __init__(self):
-
-
 
         self.root = tkinter.Tk()
         self.root.geometry('1024x600')
@@ -165,12 +202,11 @@ class UI:
 
     def setup_texts(self):
         self.title_str = "Dystrybutor płynu"
-        self.price_str = "Cena jednego litra płynu: {} PLN"
+        self.price_str = "Cena jednego litra płynu: {:.02f} PLN"
         self.start_str = "START"
         self.company_str = "FIRMA ABC"
         self.coins_currency_str = "PLN"
 
-        self.price_value = 2
         self.coins = 0
         self.flow = 0
         self.liquid = 0
@@ -184,18 +220,19 @@ class UI:
 
         if not state.menu and state.menu_prev:
             self.remove_menu()
+            self.update_texts()
             state.menu_prev = state.menu
 
         if state.menu:
-            pass
+            self.menu.draw(self.canvas)
         else:
-            self.canvas.itemconfig(self.coins_text, text=state.coins)
-            self.canvas.itemconfig(self.liquid_perc_text, text=state.percentage)
-
+            self.canvas.itemconfig(self.coins_text, text=f"{state.coins:.02f}")
+            self.canvas.itemconfig(self.liquid_perc_text, text=f"{state.percentage*100.0:.0f} %")
+            self.canvas.itemconfig(self.price_text, text=self.price_str.format(state.menu_values[const.LITER_PRICE]))
 
     def update_texts(self):
         self.canvas.itemconfig(self.title_text, text=self.title_str)
-        self.canvas.itemconfig(self.price_text, text=self.price_str.format(self.price_value))
+
         self.canvas.itemconfig(self.start_text, text=self.start_str)
         self.canvas.itemconfig(self.company_text, text=self.company_str)
         self.canvas.itemconfig(self.coins_text, text=self.coins_currency_str)
