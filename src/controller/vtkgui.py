@@ -5,6 +5,9 @@ import threading
 import websockets
 import asyncio
 import json
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 class Menu:
 
@@ -19,16 +22,21 @@ class Menu:
     def setup_menu(self):
         self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
 
-
+        xoffset = 0
         for item in self.items:
-            key_text = self.canvas.create_text(870, 10, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
-            value_text = self.canvas.create_text(560, 75, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
+            key_text = self.canvas.create_text(100, 100 + xoffset*50, fill="white", font="Segoe 35", anchor=tkinter.NW, text=item[0])
+            value_text = self.canvas.create_text(400, 100+ xoffset*50, fill="white", font="Segoe 35", anchor=tkinter.NW, text=item[1])
+            xoffset += 1
 
-            self.items
+            self.items_text.append((key_text, value_text))
 
     def remove_menu(self):
         self.canvas.delete(self.menu_bkg)
         self.menu_bkg = None
+
+        for item in self.items_text:
+            self.canvas.delete(item[0])
+            self.canvas.delete(item[1])
 
     def draw(self, canvas):
         pass
@@ -53,13 +61,14 @@ class WebSocketThread(threading.Thread):
     def __init__(self, name):
         threading.Thread.__init__(self)
         self.name = name
-        print("Start thread", self.name)
+        logging.info(f"Start thread {self.name}")
 
     async def hello(self):
         uri = "ws://localhost:8888"
 
         while not state.quit:
             try:
+                logging.info(f"Connect to server: {uri}")
                 async with websockets.connect(uri) as websocket:
                     while not state.quit:
                         msg = await websocket.recv()
@@ -82,7 +91,7 @@ class WebSocketThread(threading.Thread):
                         state.coins = round(msg['money'] * state.percentage, 2)
 
             except Exception as ex:
-                print(ex)
+                logging.info(f"Websocket error: {ex}")
 
                 if state.quit:
                     return
@@ -98,6 +107,8 @@ class WebSocketThread(threading.Thread):
 class UI:
 
     def __init__(self):
+
+
 
         self.root = tkinter.Tk()
         self.root.geometry('1024x600')
@@ -139,17 +150,18 @@ class UI:
         self.liquid_perc_text = self.canvas.create_text(470, 240, fill="#56f7f5", font="Segoe 25 bold", anchor=tkinter.CENTER,
                                                   text="")
 
+        self.menu = Menu(self.canvas)
+
         self.update_texts()
 
     def setup_menu(self):
         self.canvas.itemconfig(self.coins_text, text="")
         self.canvas.itemconfig(self.liquid_perc_text, text="")
 
-        self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
+        self.menu.setup_menu()
 
     def remove_menu(self):
-        self.canvas.delete(self.menu_bkg)
-        self.menu_bkg = None
+        self.menu.remove_menu()
 
     def setup_texts(self):
         self.title_str = "Dystrybutor płynu"
@@ -209,32 +221,6 @@ class UI:
 
         self.root.mainloop()
 
-
-"""class Circle(tkinter.Shape):
-    def __init__(self, canvas, x, y, radius):
-        super(Circle, self).__init__(canvas, x, y)
-        self.radius = radius
-
-    def draw(self):
-        left = self.x - self.radius * math.sqrt(2)
-        right = self.x + self.radius * math.sqrt(2)
-        top = self.y - self.radius * math.sqrt(2)
-        bottom = self.y + self.radius * math.sqrt(2)
-        self.canvas.create_oval(left, top, right, bottom)
-
-
-class Rectangle(tkinter.Shape):
-    def __init__(self, canvas, x, y, right, bottom):
-        super(Rectangle, self).__init__(canvas, x, y)
-        self.right = right
-        self.bottom = bottom
-
-    def draw(self):
-        left = 2 * self.x - self.right
-        right = self.right
-        top = 2 * self.y - self.bottom
-        bottom = self.bottom
-        self.canvas.create_rectangle(left, top, right, bottom)"""
 
 if __name__ == '__main__':
 

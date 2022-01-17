@@ -27,10 +27,10 @@ lock = RLock()
 
 global_dict = {}
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 
 # comminication part
-async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue):
+async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue, ctrl):
     clients = set()
 
     async def register(websocket, path):
@@ -39,6 +39,7 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
 
         # Register client
         clients.add(websocket)
+        ctrl.dirty = True
         try:
             # Wait forever for messages
             async for message in websocket:
@@ -56,8 +57,7 @@ async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue
 
         print("status_server after serve")
         while not stop_signal.is_set():
-            # TODO: there's a small bug here in that the stop signal is only checked
-            #       after a message has been processed
+
             msg = await message_queue.get()
 
             print("msg: {}".format(msg))
@@ -75,11 +75,11 @@ class Controller:
         self.stop_signal = asyncio.Event()
         self.message_queue = asyncio.Queue()
 
-        self.menu = False
+        self.menuOn = False
         self.prev_menu = True
 
         self.menu_item_index = 0
-        self.menu_item_max   = 1
+        self.menu_item_max = 1
 
         self.dirty = True
         self.state: int = const.STATE_IDLE
@@ -106,16 +106,15 @@ class Controller:
                 "liquid": self.liquid,
                 "flow": self.flow,
                 "timeout": self.timeout_timer,
-                "menu": self.menu,
+                "menu": self.menuOn,
                 "menu_item_index": self.menu_item_index}
 
     def print_pressed_keys(self, e):
         scan_code = e.scan_code
 
         """
-        
-        """
         print(scan_code)
+        """
 
         if scan_code == 33:   # letter f - flow
             self.flow_sensor_callback(1)
@@ -142,9 +141,9 @@ class Controller:
 
     def process_menu(self, key):
         if key == const.IN_UP:
-            self.menu = not self.menu
+            self.menuOn = not self.menuOn
 
-        if self.menu:
+        if self.menuOn:
             if key == const.IN_DOWN:
                 self.menu_item_index = self.menu_item_index + 1
                 if self.menu_item_index > self.menu_item_max:
@@ -194,7 +193,6 @@ class Controller:
         GPIO.add_event_detect(const.IN_COIN_TERMINAL, GPIO.RISING, callback=self.coin_callback)
 
     def flow_sensor_callback(self, channel: int) -> None:
-        self.reset_timer()
 
         if self.liquid > 0:
             self.flow += 1
@@ -216,13 +214,14 @@ class Controller:
         self.timeout_timer = const.CANCEl_TIMEOUT
 
     async def timeout_task(self):
+        logging.debug("timeout_task start")
         try:
             while True:
                 await asyncio.sleep(1)
 
                 if self.timeout_timer > 0:
                     self.timeout_timer -= 1
-                    logging.debug("timeout timer: {}".format(self.timeout_timer))
+                    logging.info("timeout timer: {}".format(self.timeout_timer))
 
         except asyncio.CancelledError:
             self.reset_timer()
@@ -230,7 +229,10 @@ class Controller:
     async def led_task(self):
         try:
             while True:
-                led_time = const.BASE_LED_TIME - (self.flow / self.liquid) * (const.BASE_LED_TIME - 0.1)
+                if self.liquid > 0 and self.flow > 0:
+                    led_time = const.BASE_LED_TIME - (self.flow / self.liquid) * (const.BASE_LED_TIME - 0.1)
+                else:
+                    led_time = const.BASE_LED_TIME
 
                 self.led(True)
                 await asyncio.sleep(led_time)
@@ -249,8 +251,6 @@ class Controller:
         logging.debug("liquid = {} ({})".format(self.liquid, amount))
 
     def coin_callback(self, channel: int) -> None:
-
-        self.reset_timer()
 
         if channel == const.IN_COIN_1:  # 1
             self.coins = self.coins + 1
@@ -280,6 +280,7 @@ class Controller:
 
     def change_state(self, value):
         self.state = value
+        self.dirty = True
 
     async def run(self, loop):
 
@@ -288,26 +289,47 @@ class Controller:
         timeout = None
 
         self.ws_server_task = loop.create_task(
-            status_server(self.stop_signal, self.message_queue))
+            status_server(self.stop_signal, self.message_queue, self))
 
         while True:
 
             if self.state == const.STATE_MENU:
-                if not self.menu:
+                logging.debug(f"state: STATE_MENU m:{self.menuOn}")
+
+                if self.timeout_timer == 0:
+                    self.menuOn = False
+
+                if not self.menuOn:
                     self.change_state(const.STATE_IDLE)
+
+                    if timeout is not None:
+                        timeout.cancel()
+                        timeout = None
 
             elif self.state == const.STATE_IDLE:
 
-                if self.menu:
+                logging.debug(f"state: STATE_IDLE  m:{self.menuOn}")
+
+                if self.menuOn:
                     self.change_state(const.STATE_MENU)
+                    if timeout is None:
+                        timeout = loop.create_task(self.timeout_task())
+
                 elif self.check():
                     self.pump(True)
                     self.change_state(const.STATE_WORKING)
                     blink = loop.create_task(self.led_task())
-                    timeout = loop.create_task(self.timeout_task())
+                    if timeout is None:
+                        timeout = loop.create_task(self.timeout_task())
 
             elif self.state == const.STATE_WORKING:
-                if not self.check():
+
+                logging.debug(f"state: STATE_WORKING")
+
+                if self.menuOn:
+                    self.change_state(const.STATE_MENU)
+
+                elif not self.check():
                     self.pump(False)
                     self.reset()
                     self.change_state(const.STATE_IDLE)
@@ -317,9 +339,11 @@ class Controller:
 
                     if timeout is not None:
                         timeout.cancel()
+                        timeout = None
 
             if self.dirty:
                 self.dirty = False
+                self.reset_timer()
                 await self.message_queue.put(json.dumps(self.get_status()))
 
             await asyncio.sleep(0.1)
