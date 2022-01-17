@@ -29,6 +29,7 @@ global_dict = {}
 
 logging.basicConfig(level=logging.INFO)
 
+
 # comminication part
 async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue, ctrl):
     clients = set()
@@ -80,6 +81,7 @@ class Controller:
 
         self.menu_item_index = 0
         self.menu_item_max = 1
+        self.menu_values = [100, 2]
 
         self.dirty = True
         self.state: int = const.STATE_IDLE
@@ -105,9 +107,9 @@ class Controller:
         return {"money": self.coins,
                 "liquid": self.liquid,
                 "flow": self.flow,
-                "timeout": self.timeout_timer,
                 "menu": self.menuOn,
-                "menu_item_index": self.menu_item_index}
+                "menu_item_index": self.menu_item_index,
+                "menu_values": self.menu_values}
 
     def print_pressed_keys(self, e):
         scan_code = e.scan_code
@@ -148,6 +150,18 @@ class Controller:
                 self.menu_item_index = self.menu_item_index + 1
                 if self.menu_item_index > self.menu_item_max:
                     self.menu_item_index = 0
+
+            elif key == const.IN_RIGHT:
+                v = self.menu_values[self.menu_item_index] + 1
+                if v > 1000:
+                    v = 1000
+                self.menu_values[self.menu_item_index] = v
+
+            elif key == const.IN_LEFT:
+                v = self.menu_values[self.menu_item_index] - 1
+                if v < 0:
+                    v = 0
+                self.menu_values[self.menu_item_index] = v
 
         self.dirty = True
 
@@ -245,7 +259,7 @@ class Controller:
 
     def inc_liquid(self, amount: int):
 
-        self.liquid += amount * 100
+        self.liquid += round((amount / self.menu_values[const.LITER_PRICE]) * self.menu_values[const.TICK_PER_LITER])
         self.dirty = True
 
         logging.debug("liquid = {} ({})".format(self.liquid, amount))
