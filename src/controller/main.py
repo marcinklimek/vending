@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # https://pythonguides.com/python-tkinter-image/
 
 # Press Shift+F10 to execute it or replace it with your code.
@@ -22,6 +24,8 @@ import random
 import websockets
 from syncer import sync
 
+from os.path import exists
+
 from threading import RLock
 lock = RLock()
 
@@ -29,6 +33,17 @@ global_dict = {}
 
 logging.basicConfig(level=logging.INFO)
 
+
+
+
+def save_json(file_name, file_content):
+    with open(file_name, 'w', encoding='utf-8') as fj:
+        json.dump(file_content, fj, ensure_ascii=False, indent=4)
+
+
+def load_json(file_name):
+    with open(file_name, 'r', encoding='utf-8') as fj:
+        return json.load(fj)
 
 # comminication part
 async def status_server(stop_signal: asyncio.Event, message_queue: asyncio.Queue, ctrl):
@@ -81,11 +96,32 @@ class Controller:
 
         self.menu_item_index = 0
         self.menu_item_max = 1
-        self.menu_values = [100, 2]
+
+
+        if exists("config.json"):
+            self.menu_values = load_json("config.json")
+        else:
+            self.menu_values = [100, 2]
+            save_json("config.json", self.menu_values)
+
+
+        if exists("stats.json"):
+            self.coins_stats = load_json("stats.json")
+        else:
+            self.coins_stats = [0, 0, 0, 0]
+            save_json("stats.json", self.coins_stats)
+
+        if exists("flow.json"):
+            self.flow_stats = load_json("flow.json")
+        else:
+            self.flow_stats = 0
+            save_json("flow.json", self.flow_stats)
+
 
         self.dirty = True
         self.state: int = const.STATE_IDLE
         self.flow: int = 0
+
         self.liquid: int = 0
         self.coins: int = 0
         self.timeout_timer: int = const.CANCEl_TIMEOUT
@@ -109,7 +145,13 @@ class Controller:
                 "flow": self.flow,
                 "menu": self.menuOn,
                 "menu_item_index": self.menu_item_index,
-                "menu_values": self.menu_values}
+                "menu_values": self.menu_values,
+                "coins_stats": self.coins_stats,
+                "flow_stats": self.flow_stats / self.menu_values[const.TICK_PER_LITER] }
+
+    def save(self):
+        save_json("stats.json", self.coins_stats)
+        save_json("flow.json", self.flow_stats)
 
     def print_pressed_keys(self, e):
         scan_code = e.scan_code
@@ -157,11 +199,15 @@ class Controller:
                     v = 1000
                 self.menu_values[self.menu_item_index] = v
 
+                save_json("config.json", self.menu_values)
+
             elif key == const.IN_LEFT:
                 v = self.menu_values[self.menu_item_index] - 1
                 if v < 0:
                     v = 0
                 self.menu_values[self.menu_item_index] = v
+
+                save_json("config.json", self.menu_values)
 
         self.dirty = True
 
@@ -209,13 +255,27 @@ class Controller:
     def flow_sensor_callback(self, channel: int) -> None:
 
         if self.liquid > 0:
+
+            self.flow_stats += 1
             self.flow += 1
             self.dirty = True
+
+            self.save()
 
             logging.debug("flow in = {}".format(self.flow))
 
     def button_callback(self, channel: int) -> None:
         logging.debug("button: {}".format(channel))
+
+        if channel == const.IN_UP:  # up (enter menu/ exit menu)
+            self.process_menu(const.IN_UP)
+        elif scan_code == const.IN_DOWN:  # down (next item)
+            self.process_menu(const.IN_DOWN)
+        elif scan_code == const.IN_ENTER:  # right (inc)
+            self.process_menu(const.IN_RIGHT)
+        elif scan_code == const.IN_CANCEL:  # left  (dec)
+            self.process_menu(const.IN_LEFT)
+
 
     def led(self, state: bool) -> None:
         if not useGpio:
@@ -267,17 +327,32 @@ class Controller:
     def coin_callback(self, channel: int) -> None:
 
         if channel == const.IN_COIN_1:  # 1
+
+            self.coins_stats[0] += 1
             self.coins = self.coins + 1
             self.inc_liquid(1)
+
         elif channel == const.IN_COIN_2:  # 2
+
+            self.coins_stats[1] += 1
+
             self.coins = self.coins + 2
             self.inc_liquid(2)
         elif channel == const.IN_COIN_3:  # 5
+
+            self.coins_stats[2] += 1
+
             self.coins = self.coins + 5
             self.inc_liquid(5)
+
         elif channel == const.IN_COIN_TERMINAL:
+
+            self.coins_stats[3] += 1
+
             self.coins = self.coins + 1
             self.inc_liquid(1)
+
+        self.save()
 
         self.dirty = True
 
