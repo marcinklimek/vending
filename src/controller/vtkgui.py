@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import tkinter
 import time
 import math
@@ -20,6 +22,10 @@ class State:
     menu_item_index = 0
     quit = False
     menu_values = [-1, -1]
+
+    coins_stats = [0, 0, 0, 0]
+    flow_stats = 0.0
+
 
 state = State()
 
@@ -60,6 +66,15 @@ class Menu:
 
             self.items_text.append((key_text, value_text))
 
+        fs = round(state.flow_stats, 3)
+
+        self.stats_items = []
+        self.stats_items.append( self.canvas.create_text(650, 20, fill="white", font="Segoe 30", anchor=tkinter.NW, text="Statystyki") )
+        self.stats_items.append( self.canvas.create_text(650, 100, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"1 zł - {state.coins_stats[0]}") )
+        self.stats_items.append( self.canvas.create_text(650, 140, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"2 zł - {state.coins_stats[1]}") )
+        self.stats_items.append( self.canvas.create_text(650, 180, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"5 zł - {state.coins_stats[2]}") )
+        self.stats_items.append( self.canvas.create_text(650, 220, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"Term. - {state.coins_stats[3]}") )
+        self.stats_items.append( self.canvas.create_text(650, 260, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"Płyn - {fs}L") )
 
 
     def remove_menu(self):
@@ -72,23 +87,29 @@ class Menu:
             self.canvas.delete(item[0])
             self.canvas.delete(item[1])
 
+        for item in self.stats_items:
+            self.canvas.delete(item)
+
+        self.stats_items = []
         self.items_text = []
         self.menu_item_index = -1
 
     def draw(self, canvas):
 
-        index = 0
-        for item in self.items_text:
-            self.canvas.itemconfig(item[1], text=state.menu_values[index])
-            index += 1
+        if len(self.items_text) > 0 and len(state.menu_values) > 0:
 
-        if self.menu_item_index != state.menu_item_index:
-            self.canvas.delete(self.menu_frame)
+            index = 0
+            for item in self.items_text:
+                self.canvas.itemconfig(item[1], text=state.menu_values[index])
+                index += 1
 
-            self.menu_item_index = state.menu_item_index
-            self.menu_frame = self.canvas.create_rectangle(self.x, self.y + self.h*state.menu_item_index,
-                                                           self.x + self.w, self.y + self.h + self.h*state.menu_item_index,
-                                                           outline='red', width=2)
+            if self.menu_item_index != state.menu_item_index:
+                self.canvas.delete(self.menu_frame)
+
+                self.menu_item_index = state.menu_item_index
+                self.menu_frame = self.canvas.create_rectangle(self.x, self.y + self.h*state.menu_item_index,
+                                                               self.x + self.w, self.y + self.h + self.h*state.menu_item_index,
+                                                               outline='red', width=2)
 
 
 class WebSocketThread(threading.Thread):
@@ -129,6 +150,9 @@ class WebSocketThread(threading.Thread):
 
                         state.coins = round(msg['money'] * state.percentage, 2)
 
+                        state.coins_stats = msg['coins_stats']
+                        state.flow_stats = msg['flow_stats']
+
             except Exception as ex:
                 logging.info(f"Websocket error: {ex}")
 
@@ -148,10 +172,14 @@ class UI:
     def __init__(self):
 
         self.root = tkinter.Tk()
+        #self.root.overrideredirect(True)
         self.root.geometry('1024x600')
+
         self.root.resizable(0, 0)
         self.root.resizable(False, False)
         self.root.resizable(width=False, height=False)
+
+        #self.root.overrideredirect(True)
 
         self.canvas = tkinter.Canvas(
             self.root,
@@ -266,10 +294,11 @@ if __name__ == '__main__':
 
     try:
         UI().run()
-    except Exception:
+    except Exception as ex:
         print("Quit")
+        print(ex)
     finally:
-        print("Cleaning")
+        print("Cleaning, please wait")
         state.quit = True
-        threadWebSocket.join()
+        threadWebSocket.join(timeout=5)
 
