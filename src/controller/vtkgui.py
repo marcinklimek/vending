@@ -13,7 +13,9 @@ import constans as const
 logging.basicConfig(level=logging.INFO)
 
 class State:
-    coins = 0
+
+    money = 0
+
     flow = 0
     liquid = 0
     percentage = 0
@@ -23,8 +25,10 @@ class State:
     quit = False
     menu_values = [-1, -1]
 
-    coins_stats = [0, 0, 0, 0]
+    money_stats = [0, 0, 0, 0]
     flow_stats = 0.0
+
+    liquid_type = ""
 
 
 state = State()
@@ -35,8 +39,7 @@ class Menu:
 
     def __init__(self, canvas):
 
-        self.items.append("Impulsy na litr")
-        self.items.append("Cena za litr")
+        self.items = const.menu_items
 
         self.items_text = []
         self.canvas = canvas
@@ -50,6 +53,8 @@ class Menu:
         self.menu_bkg = None
         self.menu_frame = None
 
+        self.stats_items = []
+
 
     def setup_menu(self):
         self.menu_bkg = self.canvas.create_rectangle(10, 10, 1024 - 10, 600 - 10, fill='gray')
@@ -60,22 +65,18 @@ class Menu:
         xoffset = 0
         for item in self.items:
             key_text = self.canvas.create_text(100, 100 + xoffset*self.h, fill="white", font="Segoe 35", anchor=tkinter.NW, text=item)
-            value_text = self.canvas.create_text(400, 100+ xoffset*self.h, fill="white", font="Segoe 35", anchor=tkinter.NW, text="-1")
-
-            xoffset += 1
+            value_text = self.canvas.create_text(400, 100+ xoffset*self.h, fill="white", font="Segoe 35", anchor=tkinter.NW, text="")
 
             self.items_text.append((key_text, value_text))
+            xoffset += 1
 
         fs = round(state.flow_stats, 3)
 
         self.stats_items = []
-        self.stats_items.append( self.canvas.create_text(650, 20, fill="white", font="Segoe 30", anchor=tkinter.NW, text="Statystyki") )
-        self.stats_items.append( self.canvas.create_text(650, 100, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"1 zł - {state.coins_stats[0]}") )
-        self.stats_items.append( self.canvas.create_text(650, 140, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"2 zł - {state.coins_stats[1]}") )
-        self.stats_items.append( self.canvas.create_text(650, 180, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"5 zł - {state.coins_stats[2]}") )
-        self.stats_items.append( self.canvas.create_text(650, 220, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"Term. - {state.coins_stats[3]}") )
-        self.stats_items.append( self.canvas.create_text(650, 260, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"Płyn - {fs}L") )
-
+        self.stats_items.append( self.canvas.create_text(650, 20, fill="white", font="Segoe 30", anchor=tkinter.NW, text="Statystyka"))
+        self.stats_items.append(self.canvas.create_text(650, 100, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"aktualna: {state.money_stats[const.MONEY_STATS_CURRENT]} zł"))
+        self.stats_items.append(self.canvas.create_text(650, 140, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"globalna: {state.money_stats[const.MONEY_STATS_GLOBAL]}"))
+        self.stats_items.append( self.canvas.create_text(650, 180, fill="white", font="Segoe 20", anchor=tkinter.NW, text=f"Płyn: {fs}L"))
 
     def remove_menu(self):
         self.canvas.delete(self.menu_bkg)
@@ -100,7 +101,17 @@ class Menu:
 
             index = 0
             for item in self.items_text:
-                self.canvas.itemconfig(item[1], text=state.menu_values[index])
+
+                if const.menu_types[index] == const.MENU_TYPE_RESET:
+                    pass
+                elif const.menu_types[index] == const.MENU_TYPE_LIST:
+                    v = state.menu_values[index]
+                    state.liquid_type = const.screen_items_list[index][v]
+                    state.liquid_type_menu = const.menu_items_list[index][v]
+                    self.canvas.itemconfig(item[1], text=state.liquid_type_menu)
+
+                else:
+                    self.canvas.itemconfig(item[1], text=state.menu_values[index])
                 index += 1
 
             if self.menu_item_index != state.menu_item_index:
@@ -110,6 +121,9 @@ class Menu:
                 self.menu_frame = self.canvas.create_rectangle(self.x, self.y + self.h*state.menu_item_index,
                                                                self.x + self.w, self.y + self.h + self.h*state.menu_item_index,
                                                                outline='red', width=2)
+
+        self.canvas.itemconfig( self.stats_items[1], text=f"aktualna: {state.money_stats[const.MONEY_STATS_CURRENT]} zł")
+        self.canvas.itemconfig(self.stats_items[2], text=f"globalna: {state.money_stats[const.MONEY_STATS_GLOBAL]} zł")
 
 
 class WebSocketThread(threading.Thread):
@@ -130,7 +144,6 @@ class WebSocketThread(threading.Thread):
                 async with websockets.connect(uri) as websocket:
                     while not state.quit:
                         msg = await websocket.recv()
-                        #print(f"<<< {msg}")
 
                         msg = json.loads(msg)
 
@@ -148,13 +161,15 @@ class WebSocketThread(threading.Thread):
                         else:
                             state.percentage = round(1.0 - (state.flow / state.liquid), 2)
 
-                        state.coins = round(msg['money'] * state.percentage, 2)
+                        state.money = round(msg['money'], 2)
 
-                        state.coins_stats = msg['coins_stats']
+                        state.money_stats = msg['money_stats']
                         state.flow_stats = msg['flow_stats']
 
-            except Exception as ex:
-                logging.info(f"Websocket error: {ex}")
+                        state.liquid_type = const.screen_items_list[2][state.menu_values[2]]
+
+            except Exception as exc:
+                logging.info(f"Websocket error: {str(exc)}")
 
                 if state.quit:
                     return
@@ -189,6 +204,8 @@ class UI:
         self.canvas.pack()
 
         self.img = tkinter.PhotoImage(file='bin/bkg.png')
+
+
         self.canvas.create_image(
             0,
             0,
@@ -203,16 +220,16 @@ class UI:
         self.menu_bkg = None
 
         self.time_text = self.canvas.create_text(870, 10, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
-        self.title_text = self.canvas.create_text(560,  75, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
-        self.price_text = self.canvas.create_text(306, 545, fill="white", font="Segoe 20", anchor=tkinter.NW, text="")
+        self.title_text = self.canvas.create_text(450,  40, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
+        self.price_text = self.canvas.create_text(340, 545, fill="white", font="Segoe 20", anchor=tkinter.NW, text="")
         self.start_text = self.canvas.create_text(856, 560, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
-        self.company_text = self.canvas.create_text(10, 10, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
+        self.company_text = self.canvas.create_text(50, 210, fill="white", font="Segoe 25", anchor=tkinter.NW, text="")
 
-        self.coins_text = self.canvas.create_text(750, 240, fill="#56f7f5", font="Segoe 60 bold", anchor=tkinter.CENTER, text="")
-        self.coins_currency_text = self.canvas.create_text(750, 370, fill="#56f7f5", font="Segoe 25", anchor=tkinter.CENTER,
-                                                  text="")
+        self.money_text = self.canvas.create_text(580, 300, fill="#56f7f5", font="Segoe 60 bold", anchor=tkinter.CENTER, text="")
+        self.money_currency_text = self.canvas.create_text(710, 320, fill="white", font="Segoe 25", anchor=tkinter.CENTER,
+                                                           text="")
 
-        self.liquid_perc_text = self.canvas.create_text(470, 240, fill="#56f7f5", font="Segoe 25 bold", anchor=tkinter.CENTER,
+        self.liquid_perc_text = self.canvas.create_text(580, 410, fill="#65d49d", font="Segoe 25 bold", anchor=tkinter.CENTER,
                                                   text="")
 
         self.menu = Menu(self.canvas)
@@ -220,7 +237,7 @@ class UI:
         self.update_texts()
 
     def setup_menu(self):
-        self.canvas.itemconfig(self.coins_text, text="")
+        self.canvas.itemconfig(self.money_text, text="")
         self.canvas.itemconfig(self.liquid_perc_text, text="")
 
         self.menu.setup_menu()
@@ -229,13 +246,13 @@ class UI:
         self.menu.remove_menu()
 
     def setup_texts(self):
-        self.title_str = "Dystrybutor płynu"
+        self.title_str = "Dystrybutor płynu {}"
         self.price_str = "Cena jednego litra płynu: {:.02f} PLN"
-        self.start_str = "START"
+        self.start_str = ""
         self.company_str = "FIRMA ABC"
-        self.coins_currency_str = "PLN"
+        self.money_currency_str = "PLN"
 
-        self.coins = 0
+        self.money = 0
         self.flow = 0
         self.liquid = 0
 
@@ -254,17 +271,21 @@ class UI:
         if state.menu:
             self.menu.draw(self.canvas)
         else:
-            self.canvas.itemconfig(self.coins_text, text=f"{state.coins:.02f}")
-            self.canvas.itemconfig(self.liquid_perc_text, text=f"{state.percentage*100.0:.0f} %")
-            self.canvas.itemconfig(self.price_text, text=self.price_str.format(state.menu_values[const.LITER_PRICE]))
+            self.canvas.itemconfig(self.money_text, text=f"{round(state.money, 2):.02f}")
+
+            value = round((state.flow / state.menu_values[const.TICK_PER_LITER]), 2)
+            self.canvas.itemconfig(self.liquid_perc_text, text=f"{value} litra")
+
+            val = round(math.fabs(state.menu_values[const.LITER_PRICE]), 2)
+            self.canvas.itemconfig(self.price_text, text=self.price_str.format(val))
+
+            self.canvas.itemconfig(self.title_text, text=self.title_str.format(state.liquid_type))
 
     def update_texts(self):
-        self.canvas.itemconfig(self.title_text, text=self.title_str)
-
         self.canvas.itemconfig(self.start_text, text=self.start_str)
         self.canvas.itemconfig(self.company_text, text=self.company_str)
-        self.canvas.itemconfig(self.coins_text, text=self.coins_currency_str)
-        self.canvas.itemconfig(self.coins_currency_text, text=self.coins_currency_str)
+        self.canvas.itemconfig(self.money_text, text=self.money_currency_str)
+        self.canvas.itemconfig(self.money_currency_text, text=self.money_currency_str)
 
     def tick(self):
         time_str = time.strftime('%H:%M:%S')

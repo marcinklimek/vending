@@ -49,7 +49,9 @@ https://websockets.readthedocs.io/en/stable/index.html
 https://pythonrepo.com/repo/aaugustin-websockets-python-websocket
 
 
+# eMMC 
 
+https://raymii.org/s/blog/Raspberry_Pi_Compute_Module_4_eMMC_flashing_issues.html
 
 
 # TODO:
@@ -91,3 +93,7 @@ licznik
 
 
 poszukać rys tech do wyświetlacza
+
+
+
+

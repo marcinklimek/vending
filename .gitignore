@@ -160,3 +160,4 @@ dist
 .pnp.*
 
 /src/vgui/build/*
+*.cpython-39.pyc

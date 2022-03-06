@@ -41,9 +41,25 @@ STATE_IDLE = 0
 STATE_WORKING = 1
 STATE_MENU = 2
 
+state_str = {STATE_IDLE:"IDLE", STATE_WORKING:"WORKING", STATE_MENU:"MENU"}
+
 BASE_LED_TIME = 0.5
 
 CANCEl_TIMEOUT = 60*2
 
 TICK_PER_LITER = 0
 LITER_PRICE = 1
+
+MENU_TYPE_INT = 0
+MENU_TYPE_FLOAT = 1
+MENU_TYPE_RESET = 2
+MENU_TYPE_LIST = 3
+
+
+menu_items = ("Impulsy na litr", "Cena za litr", "Rodzaj", "Reset licznika")
+menu_types = [MENU_TYPE_INT, MENU_TYPE_FLOAT, MENU_TYPE_LIST, MENU_TYPE_RESET]
+menu_items_list = ((), (), ("letni", "zimowy"), ())
+screen_items_list = ((), (), ("letniego", "zimowego"), ())
+
+MONEY_STATS_CURRENT = 0
+MONEY_STATS_GLOBAL  = 1
