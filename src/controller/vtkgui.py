@@ -10,6 +10,15 @@ import json
 import logging
 import constans as const
 
+
+import platform
+
+enableFullscreen = True  # on rpi
+
+if platform.system() == "Windows":
+    enableFullscreen = False
+
+
 logging.basicConfig(level=logging.INFO)
 
 class State:
@@ -194,7 +203,8 @@ class UI:
         self.root.resizable(False, False)
         self.root.resizable(width=False, height=False)
 
-        #self.root.overrideredirect(True)
+        if enableFullscreen:
+            self.root.overrideredirect(True)
 
         self.canvas = tkinter.Canvas(
             self.root,
